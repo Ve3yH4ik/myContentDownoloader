@@ -6,6 +6,7 @@ import {
   Menu,
   Tray,
   nativeImage,
+  nativeTheme,
 } from "electron";
 import { createServices } from "./services";
 import { requestProfileSchema } from "../core/request-profile";
@@ -28,6 +29,18 @@ let mainWindow: BrowserWindow;
 let services: ReturnType<typeof createServices>;
 let tray: Tray | undefined;
 let quitting = false;
+let appearance: "dark" | "light" = "dark";
+const windowAppearance = () => ({
+  backgroundColor: appearance === "dark" ? "#0d1421" : "#f2f5fa",
+  titleBarStyle: "hidden" as const,
+  titleBarOverlay: {
+    color: appearance === "dark" ? "#0d1421" : "#f2f5fa",
+    symbolColor: appearance === "dark" ? "#d5e2f3" : "#33465d",
+    height: 36,
+  },
+  show: false,
+  autoHideMenuBar: true,
+});
 let previewContexts: {
   rows: RunResult["rows"];
   boundaries: Record<string, string>;
@@ -67,6 +80,14 @@ function idle() {
   if (state.busy) throw new Error("Спочатку зупиніть активну операцію");
 }
 function configure(window: BrowserWindow) {
+  let revealed = false;
+  const reveal = () => {
+    if (revealed || window.isDestroyed()) return;
+    revealed = true;
+    window.show();
+  };
+  window.once("ready-to-show", reveal);
+  window.webContents.once("did-finish-load", reveal);
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   window.webContents.on("will-navigate", (e) => e.preventDefault());
 }
@@ -79,6 +100,7 @@ function openWindow(kind: WindowKind) {
     return;
   }
   const window = new BrowserWindow({
+    ...windowAppearance(),
     parent: mainWindow,
     title: titles[kind],
     width: kind === "report" ? 1150 : 1000,
@@ -100,7 +122,11 @@ function openWindow(kind: WindowKind) {
     query: { view: kind },
   });
 }
-function execute<T>(data: unknown, timeoutMs: number,parseOnly=false): Promise<T> {
+function execute<T>(
+  data: unknown,
+  timeoutMs: number,
+  parseOnly = false,
+): Promise<T> {
   return new Promise((resolve, reject) => {
     const active = new Worker(join(__dirname, "worker.cjs"), {
       workerData: data,
@@ -112,7 +138,7 @@ function execute<T>(data: unknown, timeoutMs: number,parseOnly=false): Promise<T
     worker = active;
     activeWorkers.add(active);
     let settled = false;
-    let parseDeadline:ReturnType<typeof setTimeout>|undefined;
+    let parseDeadline: ReturnType<typeof setTimeout> | undefined;
     const finish = (error?: Error, value?: T) => {
       if (settled) return;
       settled = true;
@@ -126,9 +152,16 @@ function execute<T>(data: unknown, timeoutMs: number,parseOnly=false): Promise<T
     };
     const deadline = setTimeout(
       () => finish(new Error("Execution deadline exceeded")),
-      parseOnly?timeoutMs:timeoutMs + 10000,
+      parseOnly ? timeoutMs : timeoutMs + 10000,
     );
-    active.on('message',m=>{if(m.phase==='parsing'){parseDeadline=setTimeout(()=>finish(new Error('Parsing/Regex deadline exceeded')),services.settings.read().regex.executionTimeoutMs);}else finish(m.error?new Error(m.error):undefined,m.result);});
+    active.on("message", (m) => {
+      if (m.phase === "parsing") {
+        parseDeadline = setTimeout(
+          () => finish(new Error("Parsing/Regex deadline exceeded")),
+          services.settings.read().regex.executionTimeoutMs,
+        );
+      } else finish(m.error ? new Error(m.error) : undefined, m.result);
+    });
     active.once("error", (e) =>
       finish(e instanceof Error ? e : new Error(String(e))),
     );
@@ -224,6 +257,7 @@ app.whenReady().then(() => {
     );
   store = new ProjectStore(join(app.getPath("userData"), "projects.sqlite"));
   mainWindow = new BrowserWindow({
+    ...windowAppearance(),
     icon: app.isPackaged
       ? join(process.resourcesPath, "app.ico")
       : join(app.getAppPath(), "build", "app.ico"),
@@ -258,7 +292,12 @@ app.whenReady().then(() => {
       for (const window of BrowserWindow.getAllWindows())
         window.webContents.send("application-settings", settings);
     },
-    source=>execute<RunResult>({kind:'parse',project:state.project,document:source},services.settings.read().regex.executionTimeoutMs,true),
+    (source) =>
+      execute<RunResult>(
+        { kind: "parse", project: state.project, document: source },
+        services.settings.read().regex.executionTimeoutMs,
+        true,
+      ),
   );
   mainWindow.on("minimize", () => {
     if (services.settings.read().general.minimizeToTray) {
@@ -366,7 +405,7 @@ app.whenReady().then(() => {
               void dialog.showMessageBox(mainWindow, {
                 type: "info",
                 title: "Universal Data Downloader",
-                message: "Universal Data Downloader 0.3",
+                message: "Universal Data Downloader 0.4",
                 detail:
                   "HTTP, вкладені границі, шаблони, черга URL та сканування посилань. CDX1 compatibility не підтверджена. Вебсканер обробляє одну HTML-сторінку або sitemap, без JavaScript і рекурсивного обходу.",
               });
@@ -377,6 +416,15 @@ app.whenReady().then(() => {
     ]),
   );
   ipcMain.handle("state", () => state);
+  ipcMain.handle("appearance", (_event, theme) => {
+    if (theme !== "light" && theme !== "dark") throw new Error("Unknown theme");
+    appearance = theme;
+    nativeTheme.themeSource = theme;
+    for (const window of BrowserWindow.getAllWindows()) {
+      window.setBackgroundColor(windowAppearance().backgroundColor);
+      window.setTitleBarOverlay(windowAppearance().titleBarOverlay);
+    }
+  });
   ipcMain.handle("patch", (_e, patch) => {
     idle();
     state.project = projectSchema.parse({ ...state.project, ...patch });

@@ -6,7 +6,16 @@ import { generateUrls } from "../core/generator";
 import type { SessionState, Version, WindowKind } from "../shared/api";
 import "./style.css";
 import { EngineTools } from "./tools";
+import {
+  Icon,
+  ThemeButton,
+  HelpButton,
+  TooltipLayer,
+  type IconName,
+} from "./ui";
 const api = window.downloader;
+document.documentElement.dataset.theme =
+  localStorage.getItem("udd-theme") === "light" ? "light" : "dark";
 const names: Record<WindowKind, string> = {
   settings: "Налаштування HTTP і проєкту",
   template: "Редактор шаблону",
@@ -77,6 +86,13 @@ function App() {
     );
   return (
     <>
+      <div className="window-chrome">
+        <span className="chrome-mark" />
+        Universal Data Downloader
+        <span className="chrome-context">
+          {view ? names[view] : "Робочий простір"}
+        </span>
+      </div>
       <div className={view ? "child-shell" : "app-shell"}>
         {view ? (
           <>
@@ -86,7 +102,14 @@ function App() {
                 <small>UNIVERSAL DATA DOWNLOADER</small>
                 <h1>{names[view]}</h1>
               </div>
-              <button onClick={() => window.close()}>Закрити</button>
+              <div className="header-actions">
+                <ThemeButton />
+                <HelpButton />
+                <button onClick={() => window.close()}>
+                  <Icon name="close" />
+                  Закрити
+                </button>
+              </div>
             </header>
             <Child key={view} view={view} state={state} perform={perform} />
           </>
@@ -94,10 +117,11 @@ function App() {
           <Workspace state={state} perform={perform} />
         )}
       </div>
-      <footer role="status">
+      <footer role="status" data-tooltip={message || state.status}>
         <span className={state.busy ? "dot running" : "dot"} />
         {message || state.status}
       </footer>
+      <TooltipLayer />
     </>
   );
 }
@@ -174,50 +198,85 @@ function Workspace({ state, perform }: Props) {
   }
   return (
     <>
+      <aside className="navigation-rail" aria-label="Інструменти">
+        <span className="rail-monogram">
+          U<span />
+        </span>
+        <div className="rail-line" />
+        {(
+          [
+            ["settings", "settings", "⚙ Налаштування", "Проєкт"],
+            ["boundaries", "boundary", "◇ Границі", "Границі"],
+            ["template", "template", "▤ Редактор шаблону", "Шаблон"],
+            ["scanner", "scan", "◎ Вебсканер", "Сканер"],
+            ["http", "http", "HTTP Engine", "HTTP"],
+            ["browser", "browser", "Chromium", "Браузер"],
+            ["proxies", "proxy", "Проксі", "Проксі"],
+            ["report", "report", "▥ Звіт", "Звіт"],
+            ["application", "sliders", "Параметри програми", "Програма"],
+          ] as [WindowKind, IconName, string, string][]
+        ).map(([view, icon, label, caption]) => (
+          <button key={view} aria-label={label} onClick={() => open(view)}>
+            <Icon name={icon} />
+            <span>{caption}</span>
+          </button>
+        ))}
+        <div className="rail-end">
+          <span className="online-indicator" />
+          ЛОКАЛЬНО
+        </div>
+      </aside>
       <header className="brand">
-        <span className="app-icon">U</span>
         <div>
+          <span className="eyebrow">ВАШ РОБОЧИЙ ПРОСТІР</span>
           <h1>Майстерня даних</h1>
-          <small>UNIVERSAL DATA DOWNLOADER</small>
         </div>
         <span className="project-name">{project.name}</span>
-        <span className="version-tag">0.3 · Робоче місце</span>
+        <div className="header-actions">
+          <span className="version-tag">v0.4</span>
+          <ThemeButton />
+          <HelpButton />
+        </div>
       </header>
       <section className="tool-ribbon" aria-label="Панель інструментів">
         <button
+          aria-label="▣ Проєкти"
           title="Відкрити збережений проєкт"
           disabled={busy}
           onClick={() => open("projects")}
         >
-          ▣ Проєкти
+          <Icon name="folder" />
+          Проєкти
         </button>
         <button
           disabled={busy}
           onClick={() => perform(() => api.save(input()))}
         >
+          <Icon name="save" />
           Зберегти проєкт
         </button>
         <span className="divider" />
         <button
           className="primary"
+          aria-label="▶ Запустити"
           disabled={busy}
           onClick={() => perform(() => api.run(input()))}
         >
-          ▶ Запустити
+          <Icon name="play" />
+          Запустити
         </button>
-        <button disabled={!busy} onClick={() => perform(() => api.stop())}>
-          ■ Зупинити
+        <button
+          aria-label="■ Зупинити"
+          disabled={!busy}
+          onClick={() => perform(() => api.stop())}
+        >
+          <Icon name="stop" />
+          Зупинити
         </button>
-        <span className="divider" />
-        <button onClick={() => open("settings")}>⚙ Налаштування</button>
-        <button onClick={() => open("boundaries")}>◇ Границі</button>
-        <button onClick={() => open("template")}>▤ Редактор шаблону</button>
-        <button onClick={() => open("scanner")}>◎ Вебсканер</button>
-        <button onClick={() => open("report")}>▥ Звіт</button>
-        <button onClick={() => open("http")}>HTTP Engine</button>
-        <button onClick={() => open("browser")}>Chromium</button>
-        <button onClick={() => open("proxies")}>Проксі</button>
-        <button onClick={() => open("application")}>Параметри програми</button>
+        <span className="toolbar-note">
+          <span className={busy ? "activity-pulse active" : "activity-pulse"} />
+          {busy ? "Обробка даних" : "Готово до роботи"}
+        </span>
       </section>
       <section className="download-bar">
         <label className="grow">

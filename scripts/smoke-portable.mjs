@@ -5,7 +5,7 @@ import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
 import {setTimeout as delay} from 'node:timers/promises';
 import {chromium} from 'playwright';
-const file=resolve(process.argv[2]??'release/UniversalDataDownloader-0.3.0-Portable.exe');
+const file=resolve(process.argv[2]??'release/UniversalDataDownloader-0.4.0-Portable.exe');
 const data=await mkdtemp(join(tmpdir(),'udd-portable-'));
 const server=createServer((_req,res)=>res.end('<title>Portable fixture</title><p>ready</p>'));
 await new Promise(r=>server.listen(0,'127.0.0.1',r));

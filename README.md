@@ -2,9 +2,11 @@
 
 Windows desktop-програма для завантаження й обробки даних. Власна реалізація за функціональним ТЗ; сумісність з Content Downloader X1 ще не підтверджена.
 
-## Windows 0.3 — запуск подвійним кліком
+## Windows 0.4 — оновлений дизайн
 
-Відкрийте **UniversalDataDownloader-0.3.0-Portable.exe** у папці `release`. Node.js, npm і встановлений Chrome не потрібні — Electron та Chromium включені. Результати CI-збірки також доступні в GitHub Actions як артефакт UniversalDataDownloader-Windows-x64 (14 днів).
+Відкрийте **UniversalDataDownloader-0.4.0-Portable.exe** у папці `release`. Node.js, npm і встановлений Chrome не потрібні — Electron та Chromium включені. Результати CI-збірки також доступні в GitHub Actions як артефакт UniversalDataDownloader-Windows-x64 (14 днів).
+
+Новий вигляд: графітова/світла теми, ліва навігація, SVG-піктограми, м’яка поява вікон і панелей, підказки для миші/клавіатури. Кнопка сонця/місяця перемикає тему; F1 відкриває коротку довідку; Alt показує меню Windows. Системне зменшення руху враховується. Деталі — docs/design-0.4.md.
 
 Нові вікна панелі інструментів: **HTTP Engine**, **Chromium**, **Проксі**, **Параметри програми**. HTTP і браузер працюють зі спільним RequestProfile та передають дані до наявного Parsing Workflow. Браузер має DOM/CSS/XPath inspector, JS editor, запис/редагування/виконання дій і захищені сесії. Менеджер проксі підтримує HTTP/HTTPS/SOCKS4/SOCKS5, auth, import/check/schedule/rotation/origin binding/stats. Application Settings має 12 вкладок, typed schema, defaults/validation/migration/import/export/reset/source.
 

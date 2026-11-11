@@ -32,6 +32,7 @@ export interface Version {
   saved_at: string;
 }
 export interface DownloaderApi {
+  appearance(theme:'dark'|'light'):Promise<void>;
   subscribeSettings(
     listener: (settings: import("../core/settings").AppSettings) => void,
   ): () => void;

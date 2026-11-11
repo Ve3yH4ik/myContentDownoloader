@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { DownloaderApi, SessionState } from "../shared/api";
 const api: DownloaderApi = {
+  appearance:theme=>ipcRenderer.invoke('appearance',theme),
   subscribeSettings: (listener) => {
     const handler = (
       _event: unknown,
