@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "name": "Каталог — перший наскрізний сценарій",
+  "url": "http://127.0.0.1:4179",
+  "timeoutMs": 30000,
+  "template": "[INDEX_ID]. [VALUE]",
+  "boundaries": [
+    { "id": "title", "name": "Заголовок", "mode": "between", "start": "<title>", "end": "</title>", "pipeline": [{"type":"trimWhitespace"}] },
+    { "id": "products", "name": "Товари", "mode": "between", "start": "<article>", "end": "</article>", "repeat": true, "children": [
+      { "id": "name", "name": "Назва товару", "mode": "regex", "expression": "<h2>(.*?)</h2>", "pipeline": [{"type":"htmlToText"},{"type":"trimWhitespace"}] },
+      { "id": "price", "name": "Ціна", "mode": "between", "start": "<price>", "end": "</price>", "pipeline": [{"type":"replace","find":"[^0-9.]","replacement":"","regex":true,"flags":"g"}] }
+    ] }
+  ]
+}
