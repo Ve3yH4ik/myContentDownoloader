@@ -1,0 +1,23 @@
+appId: ua.udd.desktop
+productName: Universal Data Downloader
+asar: false
+compression: normal
+directories:
+  output: release
+files:
+  - dist/**/*
+  - package.json
+extraResources:
+  - from: build/app.ico
+    to: app.ico
+  - from: vendor/browsers
+    to: browsers
+    filter:
+      - chromium-*/**/*
+win:
+  target: portable
+  executableName: Universal Data Downloader
+  icon: build/app.ico
+  signExecutable: false
+portable:
+  artifactName: UniversalDataDownloader-${version}-Portable.exe

@@ -1,6 +1,17 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { DownloaderApi, SessionState } from "../shared/api";
 const api: DownloaderApi = {
+  subscribeSettings: (listener) => {
+    const handler = (
+      _event: unknown,
+      value: import("../core/settings").AppSettings,
+    ) => listener(value);
+    ipcRenderer.on("application-settings", handler);
+    return () => {
+      ipcRenderer.removeListener("application-settings", handler);
+    };
+  },
+  service: (action, input) => ipcRenderer.invoke("service", action, input),
   state: () => ipcRenderer.invoke("state"),
   subscribe: (listener) => {
     const handler = (_event: unknown, state: SessionState) => listener(state);

@@ -1,0 +1,1 @@
+These are synthetic, publicly committed localhost-only TLS fixtures. The private key is test data, never a production credential. The certificate is trusted explicitly by the relevant test client; TLS verification is not disabled.

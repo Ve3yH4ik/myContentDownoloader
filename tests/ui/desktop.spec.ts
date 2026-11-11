@@ -13,7 +13,13 @@ test("desktop: download, inspect, save and reopen project", async () => {
   if (!address || typeof address === "string")
     throw new Error("No fixture address");
   const data = await mkdtemp(join(tmpdir(), "udd-ui-"));
-  const app = await electron.launch({ args: [".", `--user-data-dir=${data}`] });
+  const app = await electron.launch({
+    executablePath: process.env.UDD_TEST_EXECUTABLE,
+    args: [
+      ...(process.env.UDD_TEST_EXECUTABLE ? [] : ["."]),
+      `--user-data-dir=${data}`,
+    ],
+  });
   try {
     const page = await app.firstWindow();
     await expect(
@@ -105,7 +111,13 @@ test("separate tools: synchronized settings, templates, scanner, queue, report a
     throw new Error("No fixture address");
   const base = `http://127.0.0.1:${address.port}`;
   const data = await mkdtemp(join(tmpdir(), "udd-windows-"));
-  const app = await electron.launch({ args: [".", `--user-data-dir=${data}`] });
+  const app = await electron.launch({
+    executablePath: process.env.UDD_TEST_EXECUTABLE,
+    args: [
+      ...(process.env.UDD_TEST_EXECUTABLE ? [] : ["."]),
+      `--user-data-dir=${data}`,
+    ],
+  });
   try {
     const page = await app.firstWindow();
     await expect(

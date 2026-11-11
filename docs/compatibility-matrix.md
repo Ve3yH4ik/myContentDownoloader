@@ -1,5 +1,7 @@
 # Матриця сумісності
 
+0.3 додає власні HTTP/Browser/Proxy engines, Windows portable та M19. Це не є доказом CDX1 compatibility. Детальна матриця активних функцій і відкладених адаптерів — engines-settings-report.md.
+
 | Функція | Власна реалізація | CDX1 compatibility |
 |---|---|---|
 | HTTP GET / HTML | Реалізовано, UTF-8, без redirect | Не перевірено |

@@ -1,7 +1,16 @@
 import type { Project } from "../core/schema";
 import type { RunResult } from "../core/engine";
 export type WindowKind =
-  "settings" | "template" | "scanner" | "boundaries" | "report" | "projects";
+  | "settings"
+  | "template"
+  | "scanner"
+  | "boundaries"
+  | "report"
+  | "projects"
+  | "http"
+  | "browser"
+  | "proxies"
+  | "application";
 export interface ReportEntry {
   url: string;
   status: "ok" | "error";
@@ -23,6 +32,10 @@ export interface Version {
   saved_at: string;
 }
 export interface DownloaderApi {
+  subscribeSettings(
+    listener: (settings: import("../core/settings").AppSettings) => void,
+  ): () => void;
+  service<T = unknown>(action: string, input?: unknown): Promise<T>;
   state(): Promise<SessionState>;
   subscribe(listener: (state: SessionState) => void): () => void;
   patch(patch: Partial<Project>): Promise<void>;

@@ -1,4 +1,16 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu } from "electron";
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  Menu,
+  Tray,
+  nativeImage,
+} from "electron";
+import { createServices } from "./services";
+import { requestProfileSchema } from "../core/request-profile";
+import iconv from "iconv-lite";
+import { readdirSync, existsSync } from "node:fs";
 import { Worker } from "node:worker_threads";
 import { join } from "node:path";
 import { writeFile } from "node:fs/promises";
@@ -9,9 +21,13 @@ import { toCsv, type RunResult } from "../core/engine";
 import example from "../../examples/products.json";
 import type { SessionState, WindowKind } from "../shared/api";
 let worker: Worker | undefined;
+const activeWorkers = new Set<Worker>();
 let stopped = false;
 let store: ProjectStore;
 let mainWindow: BrowserWindow;
+let services: ReturnType<typeof createServices>;
+let tray: Tray | undefined;
+let quitting = false;
 let previewContexts: {
   rows: RunResult["rows"];
   boundaries: Record<string, string>;
@@ -32,6 +48,10 @@ const titles: Record<WindowKind, string> = {
   boundaries: "Редактор границь",
   report: "Звіт виконання",
   projects: "Збережені проєкти",
+  http: "HTTP Engine",
+  browser: "Browser Automation",
+  proxies: "Proxy Manager",
+  application: "Application Settings",
 };
 let state: SessionState = {
   project: projectSchema.parse(example),
@@ -80,30 +100,35 @@ function openWindow(kind: WindowKind) {
     query: { view: kind },
   });
 }
-function execute<T>(data: unknown, timeoutMs: number): Promise<T> {
+function execute<T>(data: unknown, timeoutMs: number,parseOnly=false): Promise<T> {
   return new Promise((resolve, reject) => {
     const active = new Worker(join(__dirname, "worker.cjs"), {
       workerData: data,
-      resourceLimits: { maxOldGenerationSizeMb: 256 },
+      resourceLimits: {
+        maxOldGenerationSizeMb:
+          services?.settings.read().performance.maxWorkerMb ?? 256,
+      },
     });
     worker = active;
+    activeWorkers.add(active);
     let settled = false;
+    let parseDeadline:ReturnType<typeof setTimeout>|undefined;
     const finish = (error?: Error, value?: T) => {
       if (settled) return;
       settled = true;
       clearTimeout(deadline);
+      clearTimeout(parseDeadline);
       if (worker === active) worker = undefined;
+      activeWorkers.delete(active);
       void active
         .terminate()
         .finally(() => (error ? reject(error) : resolve(value!)));
     };
     const deadline = setTimeout(
       () => finish(new Error("Execution deadline exceeded")),
-      timeoutMs + 10000,
+      parseOnly?timeoutMs:timeoutMs + 10000,
     );
-    active.once("message", (m) =>
-      finish(m.error ? new Error(m.error) : undefined, m.result),
-    );
+    active.on('message',m=>{if(m.phase==='parsing'){parseDeadline=setTimeout(()=>finish(new Error('Parsing/Regex deadline exceeded')),services.settings.read().regex.executionTimeoutMs);}else finish(m.error?new Error(m.error):undefined,m.result);});
     active.once("error", (e) =>
       finish(e instanceof Error ? e : new Error(String(e))),
     );
@@ -115,13 +140,27 @@ function execute<T>(data: unknown, timeoutMs: number): Promise<T> {
   });
 }
 async function runSingle(project: Project): Promise<RunResult> {
+  project = { ...project, requestProfile: services.profile(project) };
   const start = performance.now();
+  const resolved = await services.resolveProfile(services.profile(project));
+  let succeeded = false;
   try {
     const result = await execute<RunResult>(
-      { kind: "run", project },
-      project.timeoutMs,
+      {
+        kind: "run",
+        project,
+        secrets: resolved.secrets,
+      },
+      project.requestProfile?.totalTimeoutMs ?? project.timeoutMs,
     );
     state.result = result;
+    succeeded = true;
+    const csv = services.settings.read().csv;
+    result.csv = toCsv(
+      result.rows,
+      csv.delimiter,
+      csv.lineEnding === "LF" ? "\n" : "\r\n",
+    );
     previewContexts = [previewContext(result)];
     state.history.push({
       url: project.url,
@@ -143,6 +182,11 @@ async function runSingle(project: Project): Promise<RunResult> {
     });
     throw e;
   } finally {
+    await services.recordProxy(
+      resolved.proxy,
+      succeeded,
+      performance.now() - start,
+    );
     state.history = state.history.slice(-1000);
     publish();
   }
@@ -153,14 +197,36 @@ function setError(error: unknown) {
 }
 function saveProject() {
   idle();
-  const id = store.save(state.project);
+  const saved = structuredClone(state.project);
+  if (
+    !services.settings.read().general.saveProxyReferences &&
+    saved.requestProfile
+  )
+    saved.requestProfile.proxyId = "";
+  const id = store.save(saved);
   state.status = `Збережено версію №${id}`;
   publish();
   return id;
 }
 app.whenReady().then(() => {
+  const browserRoot = app.isPackaged
+    ? join(process.resourcesPath, "browsers")
+    : join(app.getAppPath(), "vendor", "browsers");
+  const chromiumFolder = existsSync(browserRoot)
+    ? readdirSync(browserRoot).find((name) => name.startsWith("chromium-"))
+    : undefined;
+  if (chromiumFolder)
+    process.env.UDD_CHROMIUM_PATH = join(
+      browserRoot,
+      chromiumFolder,
+      "chrome-win64",
+      "chrome.exe",
+    );
   store = new ProjectStore(join(app.getPath("userData"), "projects.sqlite"));
   mainWindow = new BrowserWindow({
+    icon: app.isPackaged
+      ? join(process.resourcesPath, "app.ico")
+      : join(app.getAppPath(), "build", "app.ico"),
     width: 1500,
     height: 960,
     minWidth: 1100,
@@ -174,6 +240,46 @@ app.whenReady().then(() => {
     },
   });
   configure(mainWindow);
+  services = createServices(
+    () => state.project,
+    (result) => {
+      const csv = services.settings.read().csv;
+      result.csv = toCsv(
+        result.rows,
+        csv.delimiter,
+        csv.lineEnding === "LF" ? "\n" : "\r\n",
+      );
+      state.result = result;
+      previewContexts = [previewContext(result)];
+      state.status = `Завершено · ${result.rows.length} рядків`;
+      publish();
+    },
+    (settings) => {
+      for (const window of BrowserWindow.getAllWindows())
+        window.webContents.send("application-settings", settings);
+    },
+    source=>execute<RunResult>({kind:'parse',project:state.project,document:source},services.settings.read().regex.executionTimeoutMs,true),
+  );
+  mainWindow.on("minimize", () => {
+    if (services.settings.read().general.minimizeToTray) {
+      mainWindow.hide();
+      if (!tray) {
+        tray = new Tray(
+          nativeImage.createFromDataURL(
+            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+          ),
+        );
+        tray.setToolTip("Universal Data Downloader");
+        tray.setContextMenu(
+          Menu.buildFromTemplate([
+            { label: "Відкрити", click: () => mainWindow.show() },
+            { label: "Вихід", click: () => app.quit() },
+          ]),
+        );
+        tray.on("double-click", () => mainWindow.show());
+      }
+    }
+  });
   const action = (fn: () => unknown) => () => {
     try {
       fn();
@@ -215,6 +321,15 @@ app.whenReady().then(() => {
         label: "Налаштування",
         submenu: [
           { label: "HTTP і проєкт…", click: () => openWindow("settings") },
+          {
+            label: "Налаштування програми…",
+            click: () => openWindow("application"),
+          },
+          {
+            label: "RequestProfile / HTTP Engine…",
+            click: () => openWindow("http"),
+          },
+          { label: "Proxy Manager…", click: () => openWindow("proxies") },
           { label: "Границі парсингу…", click: () => openWindow("boundaries") },
           { label: "Шаблон результату…", click: () => openWindow("template") },
         ],
@@ -230,6 +345,7 @@ app.whenReady().then(() => {
         label: "Web",
         submenu: [
           { label: "Вебсканер / Sitemap…", click: () => openWindow("scanner") },
+          { label: "Browser Automation…", click: () => openWindow("browser") },
         ],
       },
       {
@@ -250,7 +366,7 @@ app.whenReady().then(() => {
               void dialog.showMessageBox(mainWindow, {
                 type: "info",
                 title: "Universal Data Downloader",
-                message: "Universal Data Downloader 0.2",
+                message: "Universal Data Downloader 0.3",
                 detail:
                   "HTTP, вкладені границі, шаблони, черга URL та сканування посилань. CDX1 compatibility не підтверджена. Вебсканер обробляє одну HTML-сторінку або sitemap, без JavaScript і рекурсивного обходу.",
               });
@@ -309,26 +425,58 @@ app.whenReady().then(() => {
     let errors = 0;
     publish();
     try {
-      for (const [index, url] of project.urlQueue.entries()) {
-        if (stopped) break;
-        state.status = `Черга ${index + 1}/${project.urlQueue.length}: ${url}`;
-        publish();
-        try {
-          const result = await runSingle({ ...project, url });
-          last = result;
-          rows.push(...result.rows.map((row) => ({ ...row, _url: url })));
-          outputs.push(result.output);
-          contexts.push(previewContext(result));
-        } catch {
-          errors++;
+      const results: { result: RunResult; url: string }[] = [];
+      let cursor = 0;
+      let collected = 0;
+      const consume = async () => {
+        while (!stopped && cursor < project.urlQueue.length) {
+          const index = cursor++;
+          const url = project.urlQueue[index];
+          state.status = `Черга ${index + 1}/${project.urlQueue.length}: ${url}`;
+          publish();
+          try {
+            const result = await runSingle({ ...project, url });
+            collected += result.rows.length;
+            if (collected > services.settings.read().performance.maxQueueRows) {
+              stopped = true;
+              throw new Error("Queue row limit exceeded");
+            }
+            results[index] = { result, url };
+          } catch {
+            errors++;
+          }
         }
+      };
+      await Promise.all(
+        Array.from(
+          {
+            length: Math.min(
+              services.settings.read().performance.threads,
+              project.urlQueue.length,
+            ),
+          },
+          consume,
+        ),
+      );
+      for (const entry of results) {
+        if (!entry) continue;
+        last = entry.result;
+        rows.push(
+          ...entry.result.rows.map((row) => ({ ...row, _url: entry.url })),
+        );
+        outputs.push(entry.result.output);
+        contexts.push(previewContext(entry.result));
       }
       if (last)
         state.result = {
           ...last,
           rows,
           json: JSON.stringify(rows, null, 2),
-          csv: toCsv(rows),
+          csv: toCsv(
+            rows,
+            services.settings.read().csv.delimiter,
+            services.settings.read().csv.lineEnding === "LF" ? "\n" : "\r\n",
+          ),
           output: outputs.join("\n"),
           log: [...last.log, `Queue: ${rows.length} rows; ${errors} errors`],
         };
@@ -343,7 +491,7 @@ app.whenReady().then(() => {
   });
   ipcMain.handle("stop", async () => {
     stopped = true;
-    await worker?.terminate();
+    await Promise.all([...activeWorkers].map((active) => active.terminate()));
   });
   ipcMain.handle("save", (_e, input) => {
     idle();
@@ -351,10 +499,48 @@ app.whenReady().then(() => {
     return saveProject();
   });
   ipcMain.handle("list", () => store.list());
-  ipcMain.handle("open", (_e, id) => {
+  ipcMain.handle("open", async (_e, id) => {
     idle();
     if (!Number.isInteger(id)) throw new Error("Invalid project ID");
-    const project = store.open(id);
+    let project = store.open(id);
+    let mode = services.settings.read().policies.manual;
+    if (mode === "ask") {
+      const answer = await dialog.showMessageBox(mainWindow, {
+        message: "Як відкрити проєкт?",
+        buttons: ["Замінити", "Об’єднати", "Залишити поточний"],
+        cancelId: 2,
+      });
+      mode =
+        answer.response === 0
+          ? "replace"
+          : answer.response === 1
+            ? "merge"
+            : "keep";
+    }
+    if (mode === "keep") return state.project;
+    if (mode === "merge")
+      project = projectSchema.parse({
+        ...state.project,
+        ...project,
+        boundaries: [
+          ...new Map(
+            [...state.project.boundaries, ...project.boundaries].map((b) => [
+              b.id,
+              b,
+            ]),
+          ).values(),
+        ],
+        urlQueue: [
+          ...new Set([...state.project.urlQueue, ...project.urlQueue]),
+        ],
+      });
+    if (mode === "rename") {
+      const base = project.name;
+      let suffix = 2;
+      const existing = store.list().map((p) => p.name);
+      while (existing.includes(project.name))
+        project.name = `${base} (${suffix++})`;
+    }
     state.project = project;
     state.result = undefined;
     state.status = `Відкрито версію №${id}`;
@@ -397,7 +583,7 @@ app.whenReady().then(() => {
   ipcMain.handle("preview", (_e, template) => {
     if (typeof template !== "string") throw new Error("Invalid template");
     if (!state.result) throw new Error("Спочатку виконайте сценарій");
-    return previewContexts
+    const output = previewContexts
       .flatMap((context) =>
         context.rows.map((row, index) =>
           renderTemplate(template, {
@@ -409,6 +595,8 @@ app.whenReady().then(() => {
         ),
       )
       .join("\n");
+    services.recordPreview(output);
+    return output;
   });
   ipcMain.handle("export", async (event, content, format) => {
     if (typeof content !== "string" || !["csv", "json"].includes(format))
@@ -421,8 +609,11 @@ app.whenReady().then(() => {
     if (target.canceled || !target.filePath) return false;
     await writeFile(
       target.filePath,
-      (format === "csv" ? "\ufeff" : "") + content,
-      "utf8",
+      iconv.encode(
+        (format === "csv" && services.settings.read().csv.bom ? "\ufeff" : "") +
+          content,
+        services.settings.read().encodings.export,
+      ),
     );
     return true;
   });
@@ -435,4 +626,14 @@ app.on("window-all-closed", () => {
   void worker?.terminate();
   store?.close();
   app.quit();
+});
+app.on("before-quit", (event) => {
+  if (!quitting && services) {
+    event.preventDefault();
+    quitting = true;
+    void services.close().finally(() => {
+      tray?.destroy();
+      app.quit();
+    });
+  }
 });

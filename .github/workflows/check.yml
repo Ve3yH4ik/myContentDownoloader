@@ -10,6 +10,14 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - run: npm run browser:install
       - run: npm test
       - run: npm run build
       - run: npm run test:ui
+      - run: npm run package:win
+      - uses: actions/upload-artifact@v4
+        with:
+          name: UniversalDataDownloader-Windows-x64
+          path: release/*-Portable.exe
+          compression-level: 0
+          retention-days: 14

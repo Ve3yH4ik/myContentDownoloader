@@ -1,5 +1,7 @@
 # План перевірки
 
+Оновлення 0.3: 45 core/integration tests та 3 Electron UI tests; додано локальні HTTP/HTTPS/SOCKS fixtures, browser dynamic DOM/actions/recording/intercepts/sessions, Windows vault encryption, cache, binary save, settings import/export/reset. Packaged runtime запускається з UDD_TEST_EXECUTABLE; scripts/smoke-portable.mjs перевіряє portable EXE з PATH без Node/npm. Деталі й обмеження — engines-settings-report.md.
+
 Оновлення 0.2: 19 core-тестів і 2 Electron UI-тести. Додано HTML/Sitemap/base URL/dedup/origin filter, generator limits/validation, нові project defaults, native menu, окремі вікна, template preview для одного документа й черги, scanner → queue, HTTP 404 у черзі → продовження, live report, save/open налаштувань та boundary edits. Звіт — workspace-report.md.
 
 ## Поточний етап

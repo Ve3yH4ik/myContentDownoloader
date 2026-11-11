@@ -1,6 +1,6 @@
 {
   "name": "mycontentdownoloader",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Universal Data Downloader — Windows desktop and standalone parsing core",
   "main": "dist/desktop/main.cjs",
@@ -8,18 +8,20 @@
     "build": "tsc --noEmit && vite build && node scripts/build.mjs",
     "start": "electron .",
     "dev": "npm run build && npm start",
-    "test": "vitest run tests/core.test.ts",
+    "test": "vitest run tests/core.test.ts tests/engines.test.ts",
     "test:ui": "playwright test",
     "cli": "tsx src/core/cli.ts",
     "fixture": "node scripts/fixture-server.mjs",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "package:win": "npm run build && node scripts/package-win.mjs",
+    "browser:install": "node scripts/install-browser.mjs"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Ve3yH4ik/myContentDownoloader.git"
   },
   "keywords": [],
-  "author": "",
+  "author": "Universal Data Downloader",
   "license": "UNLICENSED",
   "type": "module",
   "bugs": {
@@ -28,8 +30,15 @@
   "homepage": "https://github.com/Ve3yH4ik/myContentDownoloader#readme",
   "dependencies": {
     "cheerio": "^1.2.0",
+    "http-proxy-agent": "^9.1.0",
+    "https-proxy-agent": "^9.1.0",
+    "iconv-lite": "^0.7.3",
+    "playwright": "^1.65.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "socks": "^2.8.10",
+    "socks-proxy-agent": "^10.1.0",
+    "tough-cookie": "^6.1.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {
@@ -39,10 +48,14 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.3.0",
     "electron": "^45.3.0",
+    "electron-builder": "^26.18.0",
     "esbuild": "^0.28.2",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vite": "^8.3.8",
     "vitest": "^5.1.0"
+  },
+  "overrides": {
+    "minimatch": "11.0.8"
   }
 }

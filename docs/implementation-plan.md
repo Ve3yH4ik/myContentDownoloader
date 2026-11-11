@@ -1,5 +1,7 @@
 # План реалізації
 
+Оновлення 0.3: Windows portable із bundled Chromium; RequestProfile/HTTP Engine; browser inspector/actions/recorder/session; Proxy Manager; M19 typed settings. Поточний стан і точні обмеження — engines-settings-report.md. Реалізовано інтеграцію з деревом границь; повний графовий Workflow Engine, FTP/SFTP/CAPTCHA adapters та CDX1 compatibility залишаються окремими етапами.
+
 Уточнення 2026-11-11: за новими скриншотами й прямим запитом користувача частину desktop UX виконано раніше: робоче місце, native menus, окремі вікна, template preview, HTTP scanner/generator/queue/report. Це не змінює статус невиконаних етапів. Деталі й перевірки — workspace-report.md.
 
 1. **Поточний етап: перший наскрізний сценарій.** Документація, Electron/React/TS shell, незалежне ядро й CLI, HTTP, scalar/repeat/nested boundaries, Regex/Replace, CSV/JSON/template, trace, SQLite versions. Gate: typecheck, unit/integration, production build, Electron UI test.

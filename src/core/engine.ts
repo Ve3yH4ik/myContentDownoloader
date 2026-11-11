@@ -1,4 +1,6 @@
 import { load } from "cheerio";
+import { httpRequest } from "./http";
+import type { ResolvedSecrets } from "./request-profile";
 import { projectSchema, type Boundary, type Operation } from "./schema";
 import { renderTemplate } from "./macros";
 
@@ -153,12 +155,16 @@ function flatten(result: BoundaryResult): Record<string, string>[] {
     return rows;
   });
 }
-export function toCsv(rows: Record<string, string>[]): string {
+export function toCsv(
+  rows: Record<string, string>[],
+  delimiter = ",",
+  lineEnding = "\r\n",
+): string {
   const keys = [...new Set(rows.flatMap((row) => Object.keys(row)))];
   const escape = (v: string) => '"' + v.replace(/"/g, '""') + '"';
   return [keys, ...rows.map((row) => keys.map((k) => row[k] ?? ""))]
-    .map((row) => row.map(escape).join(","))
-    .join("\r\n");
+    .map((row) => row.map(escape).join(delimiter))
+    .join(lineEnding);
 }
 export function parseDocument(input: unknown, document: string): RunResult {
   const project = projectSchema.parse(input);
@@ -252,9 +258,36 @@ export async function fetchDocument(
 export async function runProject(
   input: unknown,
   signal?: AbortSignal,
+  secrets: ResolvedSecrets = {},
+  onParsing?:()=>void,
 ): Promise<RunResult> {
   const project = projectSchema.parse(input);
-  const { document, status, size } = await fetchDocument(project, signal);
+  const response = await httpRequest(
+    {
+      ...project.requestProfile,
+      url: project.url,
+      totalTimeoutMs:
+        project.requestProfile?.totalTimeoutMs ?? project.timeoutMs,
+      connectTimeoutMs:
+        project.requestProfile?.connectTimeoutMs ?? project.timeoutMs,
+      readTimeoutMs: project.requestProfile?.readTimeoutMs ?? project.timeoutMs,
+    },
+    secrets,
+    signal,
+  );
+  if (response.status >= 400) throw new Error(`HTTP ${response.status}`);
+  if (
+    response.status >= 300 &&
+    response.status < 400 &&
+    !project.requestProfile?.followRedirects
+  )
+    throw new Error(`HTTP ${response.status}: redirects disabled`);
+  if (response.binary)
+    throw new Error(
+      "Binary response cannot be parsed as HTML; use HTTP Inspector to save it",
+    );
+  const { text: document, status, bytes: size } = response;
+  onParsing?.();
   const result = parseDocument(project, document);
   result.log.unshift(`HTTP ${status}; ${size} bytes`);
   return result;

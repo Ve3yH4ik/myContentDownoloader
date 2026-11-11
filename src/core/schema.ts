@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { requestProfileSchema } from "./request-profile";
+import { browserActionSchema } from "./browser";
 
 export const operationSchema = z.discriminatedUnion("type", [
   z
@@ -93,6 +95,8 @@ export const projectSchema = z
     timeoutMs: z.number().int().min(100).max(120000).default(30000),
     boundaries: z.array(boundarySchema).min(1),
     template: z.string().default("[VALUE]"),
+    requestProfile: requestProfileSchema.optional(),
+    browserActions: z.array(browserActionSchema).max(2000).default([]),
     urlQueue: z
       .array(
         z

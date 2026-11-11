@@ -5,6 +5,7 @@ import { macroRegistry } from "../core/macros";
 import { generateUrls } from "../core/generator";
 import type { SessionState, Version, WindowKind } from "../shared/api";
 import "./style.css";
+import { EngineTools } from "./tools";
 const api = window.downloader;
 const names: Record<WindowKind, string> = {
   settings: "Налаштування HTTP і проєкту",
@@ -13,8 +14,33 @@ const names: Record<WindowKind, string> = {
   boundaries: "Редактор границь",
   report: "Звіт виконання",
   projects: "Збережені проєкти",
+  http: "HTTP Engine",
+  browser: "Browser Automation",
+  proxies: "Proxy Manager",
+  application: "Application Settings",
 };
 function App() {
+  useEffect(() => {
+    const apply = (s: import("../core/settings").AppSettings) => {
+      document.documentElement.style.setProperty(
+        "--editor-font-size",
+        s.editor.fontSize + "px",
+      );
+      document.documentElement.style.setProperty(
+        "--editor-tab-size",
+        String(s.editor.tabSize),
+      );
+      document.documentElement.dataset.highlight = String(s.editor.highlight);
+    };
+    const off = api.subscribeSettings(apply);
+    api
+      .service<{ value: import("../core/settings").AppSettings }>(
+        "settings.read",
+      )
+      .then((r) => apply(r.value))
+      .catch(() => {});
+    return off;
+  }, []);
   const [state, setState] = useState<SessionState>();
   const [message, setMessage] = useState("");
   useEffect(() => {
@@ -155,7 +181,7 @@ function Workspace({ state, perform }: Props) {
           <small>UNIVERSAL DATA DOWNLOADER</small>
         </div>
         <span className="project-name">{project.name}</span>
-        <span className="version-tag">0.2 · Робоче місце</span>
+        <span className="version-tag">0.3 · Робоче місце</span>
       </header>
       <section className="tool-ribbon" aria-label="Панель інструментів">
         <button
@@ -188,6 +214,10 @@ function Workspace({ state, perform }: Props) {
         <button onClick={() => open("template")}>▤ Редактор шаблону</button>
         <button onClick={() => open("scanner")}>◎ Вебсканер</button>
         <button onClick={() => open("report")}>▥ Звіт</button>
+        <button onClick={() => open("http")}>HTTP Engine</button>
+        <button onClick={() => open("browser")}>Chromium</button>
+        <button onClick={() => open("proxies")}>Проксі</button>
+        <button onClick={() => open("application")}>Параметри програми</button>
       </section>
       <section className="download-bar">
         <label className="grow">
@@ -201,7 +231,7 @@ function Workspace({ state, perform }: Props) {
         </label>
         <div className="stat">
           <small>МЕТОД</small>
-          <b>HTTP GET</b>
+          <b>HTTP {project.requestProfile?.method ?? "GET"}</b>
         </div>
         <div className="stat">
           <small>ТАЙМ-АУТ</small>
@@ -455,6 +485,8 @@ function Workspace({ state, perform }: Props) {
   );
 }
 function Child({ view, state, perform }: Props & { view: WindowKind }) {
+  if (["http", "browser", "proxies", "application"].includes(view))
+    return <EngineTools view={view} state={state} />;
   const p = state.project;
   const [name, setName] = useState(p.name);
   const [url, setUrl] = useState(p.url);

@@ -1,5 +1,7 @@
 # Архітектура
 
+Оновлення 0.3: спільна модель RequestProfile, Node HTTP transport із cookie jar та proxy agents, Playwright BrowserEngine, SOCKS bridge, ProxyPool, SettingsStore і Windows SecretVault. Services IPC не повертає розшифровані секрети; credentials підставляються перед request/context launch. HTTP/Browser inputs використовують один Parsing Workflow у Worker Thread; окремий watchdog для Regex. HTTP cache лежить у http-response-cache (окремо від Chromium Cache у case-insensitive Windows) і зашифрований. Portable включає Electron та Chromium. Детальна схема — engines-settings-report.md.
+
 Оновлення 0.2: Electron main володіє SessionState та синхронізує його з основним і дочірніми вікнами через вузький typed preload API (src/shared/api.ts). Кожен інструмент має один немодальний дочірній BrowserWindow; повторний виклик фокусує його. HTTP scanning/queue використовують той самий worker і downloader. Черга послідовна; звіт сеансу зберігається в пам'яті, конфігурація черги/генератора/сканера — у SQLite project versions. Core links/generator незалежні від Electron. Докладна семантика черги — README.md.
 
 `React renderer → вузький preload API → Electron main → Worker Thread → незалежне core`.

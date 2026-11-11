@@ -2,6 +2,16 @@
 
 Windows desktop-програма для завантаження й обробки даних. Власна реалізація за функціональним ТЗ; сумісність з Content Downloader X1 ще не підтверджена.
 
+## Windows 0.3 — запуск подвійним кліком
+
+Відкрийте **UniversalDataDownloader-0.3.0-Portable.exe** у папці `release`. Node.js, npm і встановлений Chrome не потрібні — Electron та Chromium включені. Результати CI-збірки також доступні в GitHub Actions як артефакт UniversalDataDownloader-Windows-x64 (14 днів).
+
+Нові вікна панелі інструментів: **HTTP Engine**, **Chromium**, **Проксі**, **Параметри програми**. HTTP і браузер працюють зі спільним RequestProfile та передають дані до наявного Parsing Workflow. Браузер має DOM/CSS/XPath inspector, JS editor, запис/редагування/виконання дій і захищені сесії. Менеджер проксі підтримує HTTP/HTTPS/SOCKS4/SOCKS5, auth, import/check/schedule/rotation/origin binding/stats. Application Settings має 12 вкладок, typed schema, defaults/validation/migration/import/export/reset/source.
+
+Credentials — через ID у секції «Захищені секрети Windows». Паролі/токени не слід вставляти у звичайні URL, заголовки, browser actions чи JS. FTP/SFTP, CAPTCHA та політики ще відсутніх scheduler/dependency модулів зараз зберігають конфігурацію; їхні runtime-адаптери не реалізовані. Preview Chromium використовує інтерактивні знімки; streaming/native embedded tab — не частина цього етапу. Детальна матриця: `docs/engines-settings-report.md`.
+
+Для розробки Windows: `npm.cmd ci`, `npm.cmd run browser:install`, `npm.cmd run build`, `npm.cmd start`. Portable-збірка: `npm.cmd run package:win`. Тести: `npm.cmd test`, `npm.cmd run test:ui`. Для packaged runtime встановіть UDD_TEST_EXECUTABLE у шлях до release/win-unpacked/Universal Data Downloader.exe; portable smoke: `node scripts/smoke-portable.mjs`.
+
 ## Версія 0.2 — робоче місце й окремі вікна
 
 Інтерфейс організовано за наданим прикладом: нативне меню й панель інструментів угорі; дерево границь ліворуч; шаблон і результати в центрі; інструменти праворуч; генератор та черга URL внизу.
@@ -61,6 +71,6 @@ npm.cmd run test:ui
 - `src/renderer`: React UI; `examples`: локальний приклад; `tests`: Vitest + Electron/Playwright.
 - `docs`: functional-map, macro-registry, architecture, implementation-plan, compatibility-matrix, test-plan.
 
-HTTP наразі GET, UTF-8, без redirect/credentials, до 5 MiB. Desktop має worker deadline і memory limit; CLI слід запускати зі своїми перевіреними Regex. Trace зберігає сирі значення, які можуть містити приватні дані. Не вставляйте паролі/токени в URL чи конфігурації. Експортований CSV може містити формули з джерела; відкривайте такі файли як текстові дані. Повноцінний secure credential store ще відсутній.
+Початкові приклади лишаються GET/UTF-8 із лімітом 5 MiB; RequestProfile розширює методи, redirects, proxy/secret references, encodings і resource limits. Desktop має worker deadline і memory limit; CLI слід запускати зі своїми перевіреними Regex. Trace і отримані документи можуть містити приватні дані. Експортований CSV може містити формули з джерела; відкривайте такі файли як текстові дані. Windows credential store реалізовано через DPAPI, прикладні секрети не входять у проєкт/експорт налаштувань.
 
-Ще не реалізовано: повний Workflow Engine, браузерний recorder, Monaco/React Flow, CDX1 AST/оператори, усі макроси, DB adapters, pause/resume, autosave/recovery, переносний імпорт/експорт проєкту, Windows installer/portable EXE. План та критерії — у `docs/implementation-plan.md`. Успішний запуск цього етапу не означає готовність усієї програми.
+Ще не реалізовано: повний графовий Workflow Engine, Monaco/React Flow, CDX1 AST/оператори, усі макроси, DB/FTP/SFTP/CAPTCHA adapters, pause/resume, autosave/recovery, переносний імпорт/експорт проєкту. Browser recorder та Windows portable EXE додано у 0.3. План та критерії — у `docs/implementation-plan.md`. Успішний запуск цього етапу не означає готовність усієї програми.
