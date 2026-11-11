@@ -1,5 +1,7 @@
 # План перевірки
 
+Оновлення 0.2: 19 core-тестів і 2 Electron UI-тести. Додано HTML/Sitemap/base URL/dedup/origin filter, generator limits/validation, нові project defaults, native menu, окремі вікна, template preview для одного документа й черги, scanner → queue, HTTP 404 у черзі → продовження, live report, save/open налаштувань та boundary edits. Звіт — workspace-report.md.
+
 ## Поточний етап
 
 - Vitest: локальний HTTP fixture → HTML → scalar/repeat/nested → Regex/Replace → JSON/CSV/template/trace.

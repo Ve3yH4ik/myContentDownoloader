@@ -1,5 +1,7 @@
 # Архітектура
 
+Оновлення 0.2: Electron main володіє SessionState та синхронізує його з основним і дочірніми вікнами через вузький typed preload API (src/shared/api.ts). Кожен інструмент має один немодальний дочірній BrowserWindow; повторний виклик фокусує його. HTTP scanning/queue використовують той самий worker і downloader. Черга послідовна; звіт сеансу зберігається в пам'яті, конфігурація черги/генератора/сканера — у SQLite project versions. Core links/generator незалежні від Electron. Докладна семантика черги — README.md.
+
 `React renderer → вузький preload API → Electron main → Worker Thread → незалежне core`.
 
 `CLI → core` працює без Electron. Core містить Zod-схеми, HTTP downloader, дерево границь, ordered pipeline, template registry, CSV/JSON і SQLite store. Worker запускає лише вбудовані операції; користувацький JavaScript відсутній. Worker Thread — механізм ізоляції ресурсів та зупинки, а не sandbox для недовіреного коду.

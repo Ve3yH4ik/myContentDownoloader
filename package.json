@@ -1,6 +1,6 @@
 {
   "name": "mycontentdownoloader",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Universal Data Downloader — Windows desktop and standalone parsing core",
   "main": "dist/desktop/main.cjs",

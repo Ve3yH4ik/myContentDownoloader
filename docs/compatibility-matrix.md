@@ -8,6 +8,8 @@
 | VALUE/COUNT/INDEX_ID | Власна документована семантика | Не перевірено |
 | CSV/JSON | Плоскі рядки, екран і локальні файли | Не перевірено |
 | Збереження/повторне відкриття | SQLite versions | Власний формат |
+| Головне вікно й окремі вікна інструментів | Реалізовано 0.2 за наданою структурою | Візуальна організація, не підтвердження поведінки CDX1 |
+| HTTP вебсканер / Sitemap / генератор / черга / звіт | Реалізовано 0.2, обмеження в README | Не перевірено на оригіналі |
 | CDX1 project import | Відсутній | Немає специфікації формату |
 | skip/get/case_down/reset_if_nil/break_if_nil/SETVARIABLE | Не реалізовано | Очікуються reference fixtures |
 | FILTERSTRINGS/LINEMODE/HTML-aware/nested replace AST | Не реалізовано | Очікуються reference fixtures |

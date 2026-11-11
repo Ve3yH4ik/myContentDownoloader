@@ -1,5 +1,7 @@
 # План реалізації
 
+Уточнення 2026-11-11: за новими скриншотами й прямим запитом користувача частину desktop UX виконано раніше: робоче місце, native menus, окремі вікна, template preview, HTTP scanner/generator/queue/report. Це не змінює статус невиконаних етапів. Деталі й перевірки — workspace-report.md.
+
 1. **Поточний етап: перший наскрізний сценарій.** Документація, Electron/React/TS shell, незалежне ядро й CLI, HTTP, scalar/repeat/nested boundaries, Regex/Replace, CSV/JSON/template, trace, SQLite versions. Gate: typecheck, unit/integration, production build, Electron UI test.
 2. **Advanced Text Processing.** Повний ordered pipeline, transliterate/shuffle з контрольованою випадковістю, AST, оператори з підтвердженою граматикою, Monaco suggestions/validation/step preview/history. Непідтверджені CDX1 оператори лишаються unsupported.
 3. **Workflow Engine.** Вузли, drag-and-drop React Flow, order, scopes, loops, conditions, parallel, retry, pause/resume, breakpoints. Gate: deterministic execution, cancellation/recovery tests.
