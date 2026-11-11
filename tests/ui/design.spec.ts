@@ -98,4 +98,3 @@ test("appearance: themes, keyboard hints, help, reduced motion and separate wind
     });
   }
 });
-
