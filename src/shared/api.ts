@@ -41,7 +41,8 @@ export interface DownloaderApi {
   subscribe(listener: (state: SessionState) => void): () => void;
   patch(patch: Partial<Project>): Promise<void>;
   replace(project: unknown): Promise<void>;
-  window(kind: WindowKind): Promise<void>;
+  window(kind: WindowKind,boundaryId?:string): Promise<void>;
+  subscribeBoundaryFocus(listener:(id:string)=>void):()=>void;
   run(project: unknown): Promise<RunResult>;
   runQueue(): Promise<void>;
   stop(): Promise<void>;

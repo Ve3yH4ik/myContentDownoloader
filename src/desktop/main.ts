@@ -91,22 +91,24 @@ function configure(window: BrowserWindow) {
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   window.webContents.on("will-navigate", (e) => e.preventDefault());
 }
-function openWindow(kind: WindowKind) {
+function openWindow(kind: WindowKind, boundaryId?: string) {
   if (!Object.hasOwn(titles, kind)) throw new Error("Unknown window");
   const existing = children.get(kind);
   if (existing && !existing.isDestroyed()) {
     if (existing.isMinimized()) existing.restore();
     existing.focus();
+    if (kind === "boundaries" && typeof boundaryId === "string")
+      existing.webContents.send("boundary-focus", boundaryId);
     return;
   }
   const window = new BrowserWindow({
     ...windowAppearance(),
     parent: mainWindow,
     title: titles[kind],
-    width: kind === "report" ? 1150 : 1000,
-    height: 760,
-    minWidth: 740,
-    minHeight: 540,
+    width: kind === "boundaries" ? 1480 : kind === "report" ? 1150 : 1000,
+    height: kind === "boundaries" ? 960 : 760,
+    minWidth: kind === "boundaries" ? 1080 : 740,
+    minHeight: kind === "boundaries" ? 740 : 540,
     webPreferences: {
       preload: join(__dirname, "preload.cjs"),
       contextIsolation: true,
@@ -117,9 +119,17 @@ function openWindow(kind: WindowKind) {
   children.set(kind, window);
   configure(window);
   window.removeMenu();
-  window.on("closed", () => children.delete(kind));
+  window.on("closed", () => {
+    children.delete(kind);
+    if (kind === "boundaries") void services.closeBoundary();
+  });
   void window.loadFile(join(__dirname, "../renderer/index.html"), {
-    query: { view: kind },
+    query: {
+      view: kind,
+      ...(kind === "boundaries" && typeof boundaryId === "string"
+        ? { boundary: boundaryId }
+        : {}),
+    },
   });
 }
 function execute<T>(
@@ -152,10 +162,12 @@ function execute<T>(
     };
     const deadline = setTimeout(
       () => finish(new Error("Execution deadline exceeded")),
-      parseOnly ? timeoutMs : timeoutMs + 10000,
+      parseOnly ? Math.max(15000, timeoutMs + 5000) : timeoutMs + 10000,
     );
     active.on("message", (m) => {
       if (m.phase === "parsing") {
+        if (parseOnly) clearTimeout(deadline);
+        clearTimeout(parseDeadline);
         parseDeadline = setTimeout(
           () => finish(new Error("Parsing/Regex deadline exceeded")),
           services.settings.read().regex.executionTimeoutMs,
@@ -292,9 +304,9 @@ app.whenReady().then(() => {
       for (const window of BrowserWindow.getAllWindows())
         window.webContents.send("application-settings", settings);
     },
-    (source) =>
+    (source, project = state.project) =>
       execute<RunResult>(
-        { kind: "parse", project: state.project, document: source },
+        { kind: "parse", project, document: source },
         services.settings.read().regex.executionTimeoutMs,
         true,
       ),
@@ -405,7 +417,7 @@ app.whenReady().then(() => {
               void dialog.showMessageBox(mainWindow, {
                 type: "info",
                 title: "Universal Data Downloader",
-                message: "Universal Data Downloader 0.4",
+                message: "Universal Data Downloader 0.5",
                 detail:
                   "HTTP, вкладені границі, шаблони, черга URL та сканування посилань. CDX1 compatibility не підтверджена. Вебсканер обробляє одну HTML-сторінку або sitemap, без JavaScript і рекурсивного обходу.",
               });
@@ -437,7 +449,9 @@ app.whenReady().then(() => {
     previewContexts = [];
     publish();
   });
-  ipcMain.handle("window", (_e, kind) => openWindow(kind));
+  ipcMain.handle("window", (_e, kind, boundaryId) =>
+    openWindow(kind, boundaryId),
+  );
   ipcMain.handle("run", async (_e, input) => {
     idle();
     const project = projectSchema.parse(input);

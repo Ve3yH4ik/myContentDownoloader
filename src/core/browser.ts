@@ -4,7 +4,13 @@ import {
   type BrowserContext,
   type Page,
 } from "playwright";
-import { z } from "zod";
+import { browserActionSchema, type BrowserAction } from "./browser-actions";
+export { browserActionSchema, type BrowserAction } from "./browser-actions";
+import {
+  locateSource,
+  sourceElementAt,
+  type SourceSelection,
+} from "./source-inspector";
 import { createSocksBridge } from "./proxy-bridge";
 import {
   requestProfileSchema,
@@ -12,31 +18,6 @@ import {
   type RequestProfile,
   type ResolvedSecrets,
 } from "./request-profile";
-export const browserActionSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("goto"), value: z.string() }),
-  z.object({
-    type: z.enum(["click", "waitForSelector"]),
-    selector: z.string().min(1),
-  }),
-  z.object({
-    type: z.enum(["fill", "select", "press"]),
-    selector: z.string().min(1),
-    value: z.string().default(""),
-    secretId: z.string().default(""),
-  }),
-  z.object({
-    type: z.literal("check"),
-    selector: z.string().min(1),
-    checked: z.boolean().default(true),
-  }),
-  z.object({ type: z.literal("scroll"), x: z.number(), y: z.number() }),
-  z.object({
-    type: z.literal("waitForLoad"),
-    state: z.enum(["load", "domcontentloaded", "networkidle"]),
-  }),
-  z.object({ type: z.literal("evaluate"), code: z.string().min(1) }),
-]);
-export type BrowserAction = z.infer<typeof browserActionSchema>;
 export interface BrowserSnapshot {
   url: string;
   html: string;
@@ -46,6 +27,13 @@ export interface BrowserSnapshot {
   network: { method: string; url: string; status: number }[];
   log: string[];
   json?: unknown;
+}
+export interface PickedElement extends SourceSelection {
+  tag: string;
+  text: string;
+  xpath: string;
+  rect: { x: number; y: number; width: number; height: number };
+  viewport: { width: number; height: number };
 }
 export interface BrowserOptions {
   headless: boolean;
@@ -385,9 +373,110 @@ export class BrowserEngine {
           tag: n.tagName,
           html: n.outerHTML.slice(0, 20000),
           text: n.textContent?.slice(0, 1000),
+          rect: {
+            x: n.getBoundingClientRect().x,
+            y: n.getBoundingClientRect().y,
+            width: n.getBoundingClientRect().width,
+            height: n.getBoundingClientRect().height,
+          },
         })),
       ),
     };
+  }
+  async pick(
+    x: number,
+    y: number,
+    selector?: string,
+  ): Promise<{ snapshot: BrowserSnapshot; selection: PickedElement }> {
+    if (!Number.isFinite(x) || !Number.isFinite(y))
+      throw new Error("Некоректна позиція елемента");
+    const page = this.active();
+    const info = await page.evaluate(
+      ({ x, y, selector: requestedSelector }) => {
+        const candidate = requestedSelector
+          ? requestedSelector.startsWith("xpath=")
+            ? document.evaluate(
+                requestedSelector.slice(6),
+                document,
+                null,
+                XPathResult.FIRST_ORDERED_NODE_TYPE,
+                null,
+              ).singleNodeValue
+            : document.querySelector(requestedSelector)
+          : document.elementFromPoint(x, y);
+        if (!(candidate instanceof Element))
+          throw new Error("Елемент за межами видимої сторінки");
+        const element = candidate;
+        const parts: string[] = [];
+        const xpath: string[] = [];
+        let node: Element | null = element;
+        while (node) {
+          const tag = node.tagName.toLowerCase();
+          const siblings = node.parentElement
+            ? [...node.parentElement.children].filter(
+                (n) => n.tagName === node!.tagName,
+              )
+            : [node];
+          const index = siblings.indexOf(node) + 1;
+          parts.unshift(`${tag}:nth-of-type(${index})`);
+          xpath.unshift(`*[local-name()="${tag}"][${index}]`);
+          node = node.parentElement;
+        }
+        const selector =
+          element.id &&
+          document.querySelectorAll("#" + CSS.escape(element.id)).length === 1
+            ? "#" + CSS.escape(element.id)
+            : parts.join(" > ");
+        const r = element.getBoundingClientRect();
+        return {
+          selector,
+          xpath: "/" + xpath.join("/"),
+          tag: element.tagName.toLowerCase(),
+          text: (element.textContent ?? "").slice(0, 1000),
+          rect: { x: r.x, y: r.y, width: r.width, height: r.height },
+          viewport: { width: innerWidth, height: innerHeight },
+        };
+      },
+      { x, y, selector },
+    );
+    const snapshot = await this.snapshot();
+    return {
+      snapshot,
+      selection: { ...locateSource(snapshot.html, info.selector), ...info },
+    };
+  }
+  async showSourceElement(html: string, offset: number) {
+    const located = sourceElementAt(html, offset);
+    const page = this.active();
+    const element = page.locator(located.selector).first();
+    await element.scrollIntoViewIfNeeded();
+    const point = await element.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      return {
+        x: Math.max(1, Math.min(innerWidth - 1, r.x + r.width / 2)),
+        y: Math.max(1, Math.min(innerHeight - 1, r.y + r.height / 2)),
+      };
+    });
+    return this.pick(point.x, point.y, located.selector);
+  }
+  async showSelector(selector: string) {
+    const page = this.active();
+    const el = page.locator(selector).first();
+    await el.scrollIntoViewIfNeeded();
+    const point = await el.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    });
+    return this.pick(point.x, point.y, selector);
+  }
+  async resize(width: number, height: number) {
+    if (!Number.isFinite(width) || !Number.isFinite(height))
+      throw new Error("Некоректний розмір перегляду");
+    await this.active().setViewportSize({
+      width: Math.max(320, Math.min(3840, Math.round(width))),
+      height: Math.max(200, Math.min(2160, Math.round(height))),
+    });
+    return this.snapshot();
   }
   async snapshot(): Promise<BrowserSnapshot> {
     const page = this.active();

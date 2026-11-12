@@ -6,6 +6,7 @@ import { generateUrls } from "../core/generator";
 import type { SessionState, Version, WindowKind } from "../shared/api";
 import "./style.css";
 import { EngineTools } from "./tools";
+import { BoundaryEditor } from "./boundary-editor";
 import {
   Icon,
   ThemeButton,
@@ -147,10 +148,10 @@ function Workspace({ state, perform }: Props) {
     [JSON.stringify(project.generator)],
   );
   const input = () => ({ ...project, url, template });
-  const open = (kind: WindowKind) =>
+  const open = (kind: WindowKind, boundaryId?: string) =>
     perform(async () => {
       if (!busy) await api.patch({ url, template });
-      await api.window(kind);
+      await api.window(kind, boundaryId);
     });
   const queueValues = () => [
     ...new Set(
@@ -183,7 +184,7 @@ function Workspace({ state, perform }: Props) {
           />
           <button
             title="Відкрити редактор границь"
-            onClick={() => open("boundaries")}
+            onClick={() => open("boundaries", b.id)}
           >
             <span className={b.repeat ? "repeat-symbol" : "boundary-symbol"}>
               {b.repeat ? "↻" : "◇"}
@@ -233,7 +234,7 @@ function Workspace({ state, perform }: Props) {
         </div>
         <span className="project-name">{project.name}</span>
         <div className="header-actions">
-          <span className="version-tag">v0.4</span>
+          <span className="version-tag">v0.5</span>
           <ThemeButton />
           <HelpButton />
         </div>
@@ -544,6 +545,7 @@ function Workspace({ state, perform }: Props) {
   );
 }
 function Child({ view, state, perform }: Props & { view: WindowKind }) {
+  if (view === "boundaries") return <BoundaryEditor state={state} />;
   if (["http", "browser", "proxies", "application"].includes(view))
     return <EngineTools view={view} state={state} />;
   const p = state.project;
@@ -553,7 +555,7 @@ function Child({ view, state, perform }: Props & { view: WindowKind }) {
   const [template, setTemplate] = useState(p.template);
   const [preview, setPreview] = useState("");
   const editor = useRef<HTMLTextAreaElement>(null);
-  const [config, setConfig] = useState(JSON.stringify(p.boundaries, null, 2));
+
   const [scannerUrl, setScannerUrl] = useState(p.scannerUrl || p.url);
   const [sameOrigin, setSameOrigin] = useState(p.scannerSameOrigin);
   const [links, setLinks] = useState<string[]>([]);
@@ -713,48 +715,6 @@ function Child({ view, state, perform }: Props & { view: WindowKind }) {
           {preview ||
             "Натисніть «Попередній перегляд» після виконання сценарію."}
         </pre>
-      </section>
-    );
-  if (view === "boundaries")
-    return (
-      <section className="child-content">
-        <p className="intro">
-          Редактор дерева границь у форматі JSON. children задає вкладені
-          границі, pipeline — порядок обробки. Перевірка схеми виконується перед
-          застосуванням.
-        </p>
-        <textarea
-          className="large-editor tall"
-          aria-label="Конфігурація границь"
-          spellCheck={false}
-          value={config}
-          onChange={(e) => setConfig(e.target.value)}
-        />
-        <div className="actions">
-          <button
-            className="primary"
-            disabled={state.busy}
-            onClick={() =>
-              perform(
-                () => apply({ boundaries: JSON.parse(config) }),
-                "Границі застосовано",
-              )
-            }
-          >
-            Застосувати
-          </button>
-          <button
-            disabled={state.busy}
-            onClick={() =>
-              perform(
-                () => apply({ boundaries: JSON.parse(config) }, true),
-                "Границі збережено в проєкті",
-              )
-            }
-          >
-            Застосувати й зберегти
-          </button>
-        </div>
       </section>
     );
   if (view === "scanner")

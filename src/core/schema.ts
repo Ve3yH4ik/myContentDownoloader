@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { requestProfileSchema } from "./request-profile";
-import { browserActionSchema } from "./browser";
+import { browserActionSchema } from "./browser-actions";
 
 export const operationSchema = z.discriminatedUnion("type", [
   z

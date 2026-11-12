@@ -7,6 +7,7 @@ export async function fixture() {
   let retries = 0;
   const server = http.createServer(async (req, res) => {
     const path = new URL(req.url!, "http://local").pathname;
+    if(path==='/boundary'){res.setHeader('Content-Type','text/html; charset=utf-8');res.end(readFileSync(new URL('./boundary.html',import.meta.url)));return;}
     if (path === "/gzip") {
       res.setHeader("Content-Type", "text/plain");
       res.setHeader("Content-Encoding", "gzip");

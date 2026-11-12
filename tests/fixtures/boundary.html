@@ -1,0 +1,119 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Тестовий каталог</title>
+    <style>
+      body {
+        margin: 0;
+        font:
+          16px Segoe UI,
+          Arial;
+        background: #f2f5f7;
+        color: #243c49;
+      }
+      header {
+        padding: 22px 34px;
+        background: #103e39;
+        color: #e8fff8;
+        display: flex;
+        justify-content: space-between;
+      }
+      header small {
+        opacity: 0.65;
+      }
+      main {
+        max-width: 1050px;
+        padding: 25px 35px;
+        margin: auto;
+      }
+      h1 {
+        font-size: 24px;
+        margin: 0 0 8px;
+      }
+      p {
+        color: #6b7f86;
+      }
+      section {
+        display: flex;
+        gap: 20px;
+      }
+      article {
+        border: 1px solid #dbe5e8;
+        background: white;
+        border-radius: 15px;
+        padding: 23px;
+        flex: 1;
+      }
+      .visual {
+        height: 85px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, #e1f2eb, #c4e1e0);
+        display: grid;
+        place-items: center;
+        color: #3c8c7a;
+        font-size: 36px;
+      }
+      h2 {
+        font-size: 20px;
+        line-height: 1.5;
+        margin: 16px 0 8px;
+      }
+      .price {
+        font-size: 23px;
+        color: #178573;
+        font-weight: 600;
+      }
+      button {
+        display: block;
+        border: 0;
+        border-radius: 7px;
+        background: #12796a;
+        color: white;
+        padding: 11px 18px;
+        font: 14px Segoe UI;
+        margin-top: 18px;
+      }
+      .tail {
+        height: 850px;
+        margin-top: 25px;
+        border: 1px dashed #c8d6d9;
+        border-radius: 12px;
+        padding: 25px;
+        color: #72878b;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <strong>UDD / Тестовий каталог</strong
+      ><small>Локальна сторінка для перевірки границь</small>
+    </header>
+    <main>
+      <h1>Каталог товарів</h1>
+      <p>Виберіть назву, ціну або повторюваний блок.</p>
+      <section>
+        <article id="card-one" class="product">
+          <div class="visual">◇</div>
+          <h2 id="product-name">Комплект фільтрів</h2>
+          <div class="price">120.50 UAH</div>
+          <button id="buy">Додати до кошика</button>
+        </article>
+        <article id="card-two" class="product">
+          <div class="visual">↻</div>
+          <h2>Гальмівні колодки</h2>
+          <div class="price">980 UAH</div>
+          <button>Детальніше</button>
+        </article>
+      </section>
+      <div class="tail">
+        <h2 id="below-fold">Елемент після прокручування</h2>
+        <span>Перевірка переходу з коду до сторінки</span>
+      </div>
+    </main>
+    <script>
+      window.clickCount = 0;
+      document.getElementById("buy").onclick = () => window.clickCount++;
+    </script>
+  </body>
+</html>

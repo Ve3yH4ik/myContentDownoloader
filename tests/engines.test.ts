@@ -290,6 +290,52 @@ describe("Chromium integration", () => {
     "chrome-win64",
     "chrome.exe",
   );
+  it("picks source without clicking the site and maps source back to the exact off-screen element", async () => {
+    const engine = new BrowserEngine();
+    try {
+      await engine.open(
+        { url: server.url + "/boundary" },
+        {
+          headless: true,
+          width: 1000,
+          height: 700,
+          actionTimeoutMs: 5000,
+          blockImages: false,
+          executablePath,
+        },
+      );
+      const rect = (await engine.inspect("#buy")).elements[0].rect;
+      const picked = await engine.pick(rect.x + 5, rect.y + 5);
+      expect(picked.selection.selector).toBe("#buy");
+      expect(
+        picked.snapshot.html.slice(
+          picked.selection.start,
+          picked.selection.end,
+        ),
+      ).toBe(picked.selection.outerHTML);
+      expect(
+        (await engine.act({ type: "evaluate", code: "window.clickCount" }))
+          .json,
+      ).toBe(0);
+      const parent = await engine.showSourceElement(
+        picked.snapshot.html,
+        picked.snapshot.html.indexOf('<article id="card-two"') + 3,
+      );
+      expect(parent.selection.selector).toBe("#card-two");
+      expect(
+        (await engine.inspect("xpath=" + parent.selection.xpath)).count,
+      ).toBe(1);
+      const lower = await engine.showSourceElement(
+        parent.snapshot.html,
+        parent.snapshot.html.indexOf('id="below-fold"') + 5,
+      );
+      expect(lower.selection.selector).toBe("#below-fold");
+      expect(lower.selection.rect.y).toBeGreaterThanOrEqual(0);
+      expect(lower.selection.rect.y).toBeLessThan(700);
+    } finally {
+      await engine.close();
+    }
+  }, 30000);
   for (const headless of [true, false])
     it(`dynamic DOM, inspector, forms, JavaScript, interception and workflow; headless=${headless}`, async () => {
       const engine = new BrowserEngine();

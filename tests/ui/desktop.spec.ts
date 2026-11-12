@@ -281,6 +281,7 @@ test("separate tools: synchronized settings, templates, scanner, queue, report a
     const boundaryEvent = app.waitForEvent("window");
     await page.getByRole("button", { name: "◇ Границі", exact: true }).click();
     const boundaries = await boundaryEvent;
+    await boundaries.getByRole('button',{name:'JSON границь',exact:true}).click();
     const config = JSON.parse(
       await boundaries.getByLabel("Конфігурація границь").inputValue(),
     );

@@ -5,7 +5,7 @@ import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
 import {setTimeout as delay} from 'node:timers/promises';
 import {chromium} from 'playwright';
-const file=resolve(process.argv[2]??'release/UniversalDataDownloader-0.4.0-Portable.exe');
+const file=resolve(process.argv[2]??'release/UniversalDataDownloader-0.5.0-Portable.exe');
 const data=await mkdtemp(join(tmpdir(),'udd-portable-'));
 const server=createServer((_req,res)=>res.end('<title>Portable fixture</title><p>ready</p>'));
 await new Promise(r=>server.listen(0,'127.0.0.1',r));
@@ -14,7 +14,8 @@ const processHandle=spawn(file,[`--user-data-dir=${data}`,`--remote-debugging-po
 let browser;
 try {
   let connected=false;
-  for(let i=0;i<200;i++){try{await fetch(`http://127.0.0.1:${port}/json/version`);connected=true;break;}catch{await delay(300);}}
+  // Portable extracts Electron and Chromium before starting; allow a cold Windows disk scan.
+  for(let i=0;i<600;i++){try{await fetch(`http://127.0.0.1:${port}/json/version`);connected=true;break;}catch{await delay(300);}}
   if(!connected)throw new Error('Portable app did not open');
   browser=await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
   const page=browser.contexts()[0].pages()[0];await page.getByRole('heading',{name:'Майстерня даних'}).waitFor();

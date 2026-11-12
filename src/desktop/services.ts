@@ -39,16 +39,26 @@ import {
 } from "../core/proxies";
 import { parseDocument, type RunResult } from "../core/engine";
 import type { Project } from "../core/schema";
+import { projectSchema } from "../core/schema";
+import { focusBoundary } from "../core/boundary-tree";
 export function createServices(
   getProject: () => Project,
   onResult: (r: RunResult) => void,
   onSettings: (s: AppSettings) => void,
-  parseSource:(source:string)=>Promise<RunResult>,
+  parseSource: (source: string, project?: Project) => Promise<RunResult>,
 ) {
   const root = app.getPath("userData");
   const vault = new SecretVault(join(root, "secrets.dpapi.json"));
   const settings = new SettingsStore(join(root, "settings.json"));
   const browser = new BrowserEngine();
+  let boundaryBrowser = new BrowserEngine();
+  let boundaryEpoch = 0;
+  async function closeBoundary() {
+    boundaryEpoch++;
+    boundarySnapshot = undefined;
+    await boundaryBrowser.close();
+  }
+  let boundarySnapshot: BrowserSnapshot | undefined;
   const pool = new ProxyPool();
   let proxies: ProxyProfile[] = [];
   let proxyLog: {
@@ -298,6 +308,111 @@ export function createServices(
   ipcMain.handle("service", async (_event, action: string, input: unknown) => {
     await ready;
     switch (action) {
+      case "boundary.validate":
+        return projectSchema.parse({ ...getProject(), boundaries: input })
+          .boundaries;
+      case "boundary.load": {
+        const epoch = ++boundaryEpoch;
+        const request =
+          typeof input === "string"
+            ? { url: input }
+            : (input as { url: string; width?: number; height?: number });
+        const p = profile({
+          ...getProject(),
+          url: requestProfileSchema.parse({ url: request.url }).url,
+        });
+        const resolved = await resolveProfile(p);
+        let session: string | undefined;
+        try {
+          session = await boundaryBrowser.session();
+        } catch {}
+        await boundaryBrowser.close();
+        if (epoch !== boundaryEpoch)
+          throw new Error("Завантаження редактора скасовано");
+        const active = new BrowserEngine();
+        boundaryBrowser = active;
+        const snapshot = await active.open(
+          p,
+          {
+            ...settings.read().browser,
+            width: Number.isFinite(request.width)
+              ? Math.max(320, Math.min(3840, Math.round(request.width!)))
+              : settings.read().browser.width,
+            height: Number.isFinite(request.height)
+              ? Math.max(200, Math.min(2160, Math.round(request.height!)))
+              : settings.read().browser.height,
+            headless: true,
+            executablePath: process.env.UDD_CHROMIUM_PATH,
+          },
+          resolved.secrets,
+          session,
+        );
+        if (epoch !== boundaryEpoch) {
+          await active.close();
+          throw new Error("Вікно редактора закрито або завантаження скасовано");
+        }
+        boundarySnapshot = snapshot;
+        return snapshot;
+      }
+      case "boundary.pick": {
+        const p = input as { x: number; y: number };
+        const picked = await boundaryBrowser.pick(p.x, p.y);
+        boundarySnapshot = picked.snapshot;
+        return picked;
+      }
+      case "boundary.locate": {
+        if (!boundarySnapshot) throw new Error("Спочатку завантажте сторінку");
+        const picked = await boundaryBrowser.showSourceElement(
+          boundarySnapshot.html,
+          Number(input),
+        );
+        boundarySnapshot = picked.snapshot;
+        return picked;
+      }
+      case "boundary.refresh":
+        boundarySnapshot = await boundaryBrowser.snapshot();
+        return boundarySnapshot;
+      case "boundary.inspect":
+        return boundaryBrowser.inspect(String(input));
+      case "boundary.viewport": {
+        const p = input as { width: number; height: number };
+        boundarySnapshot = await boundaryBrowser.resize(p.width, p.height);
+        return boundarySnapshot;
+      }
+      case "boundary.selector": {
+        const picked = await boundaryBrowser.showSelector(String(input));
+        boundarySnapshot = picked.snapshot;
+        return picked;
+      }
+      case "boundary.click": {
+        const p = input as { x: number; y: number };
+        boundarySnapshot = await boundaryBrowser.point(p.x, p.y);
+        return boundarySnapshot;
+      }
+      case "boundary.scroll": {
+        const p = input as { x: number; y: number };
+        boundarySnapshot = await boundaryBrowser.wheel(p.x, p.y);
+        return boundarySnapshot;
+      }
+      case "boundary.close":
+        await closeBoundary();
+        return true;
+      case "boundary.preview": {
+        const p = input as { boundaries: unknown; id: string; html: string };
+        if (
+          typeof p.html !== "string" ||
+          Buffer.byteLength(p.html) > 20 * 1024 * 1024
+        )
+          throw new Error("HTML відсутній або перевищує ліміт");
+        const project = projectSchema.parse({
+          ...getProject(),
+          boundaries: p.boundaries,
+        });
+        project.boundaries = focusBoundary(project.boundaries, p.id);
+        if (!project.boundaries.length) throw new Error("Границю не знайдено");
+        project.template = "[VALUE]";
+        return parseSource(p.html, project);
+      }
       case "settings.read":
         return {
           value: settings.read(),
@@ -582,9 +697,11 @@ export function createServices(
       }
     },
     resolveProfile,
+    closeBoundary,
     close: async () => {
       if (timer) clearInterval(timer);
       await browser.close();
+      await boundaryBrowser.close();
       await persistence;
       if (settings.read().general.clearCacheOnExit) await cacheClear();
     },

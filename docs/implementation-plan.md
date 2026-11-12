@@ -1,5 +1,7 @@
 # План реалізації
 
+Оновлення 0.5 (2026-11-12): за скриншотом користувача реалізовано окреме вікно границь із source/page/URL, F4/Ctrl-click, формами та focused nested preview. Звіт — boundary-editor-0.5.md.
+
 Оновлення 0.4: за пріоритетом користувача змінено дизайн desktop, теми, навігацію, анімації та підказки; зібрано Windows portable. Функціональні етапи нижче збережено. Звіт — design-0.4.md.
 
 Оновлення 0.3: Windows portable із bundled Chromium; RequestProfile/HTTP Engine; browser inspector/actions/recorder/session; Proxy Manager; M19 typed settings. Поточний стан і точні обмеження — engines-settings-report.md. Реалізовано інтеграцію з деревом границь; повний графовий Workflow Engine, FTP/SFTP/CAPTCHA adapters та CDX1 compatibility залишаються окремими етапами.
